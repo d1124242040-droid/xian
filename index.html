@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>吳世賢SDGs 不塑永續-淨灘</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            user-select: none;
+            overflow: hidden;
+            background-color: #0c4a6e;
+        }
+
+        /* 浮點得分動畫 */
+        @keyframes floatUp {
+            0% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -100%) scale(1.2);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -150%) scale(1);
+            }
+        }
+        .score-float {
+            position: absolute;
+            animation: floatUp 0.8s ease-out forwards;
+            pointer-events: none;
+            font-weight: 900;
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.5);
+            z-index: 50;
+        }
+
+        /* 海浪動畫 */
+        @keyframes waveMove {
+            0% { transform: translateX(0) scaleY(1); }
+            50% { transform: translateX(-25px) scaleY(1.05); }
+            100% { transform: translateX(0) scaleY(1); }
+        }
+        .animate-wave {
+            animation: waveMove 4s ease-in-out infinite;
+        }
+
+        /* 垃圾懸停與點擊效果 */
+        .trash-item {
+            transition: transform 0.15s ease, filter 0.15s ease;
+            cursor: pointer;
+            position: absolute;
+            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+        }
+        .trash-item:hover {
+            filter: drop-shadow(0 6px 12px rgba(255, 255, 255, 0.6)) brightness(1.15);
+        }
+        .trash-item:active {
+            transform: scale(0.8) !important;
+        }
+
+        /* 閃爍亮光效果 */
+        @keyframes sparkle {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+        .sparkle-bg {
+            animation: sparkle 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between relative">
+
+    <!-- 頂部資訊列 (Header) -->
+    <header class="w-full bg-slate-900/80 backdrop-blur-md text-white px-4 md:px-8 py-3 flex justify-between items-center z-40 border-b border-cyan-500/30 shadow-lg">
+        <!-- 左上角標題 -->
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-emerald-500 to-cyan-400 p-2 rounded-xl text-white shadow-md">
+                <i class="fa-solid font-bold fa-leaf text-xl md:text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl md:text-2xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-200 to-cyan-400">
+                    吳世賢SDGs 不塑永續-淨灘
+                </h1>
+                <p class="text-xs text-cyan-200/80 hidden sm:block">守護海洋環境 • 齊心清理海岸垃圾</p>
+            </div>
+        </div>
+
+        <!-- 右上角數據統計與控制按鈕 -->
+        <div class="flex items-center space-x-4 md:space-x-6">
+            <!-- 剩餘關卡/進度資訊 -->
+            <div class="bg-slate-800/90 border border-slate-700 px-3 md:px-4 py-1.5 rounded-xl flex items-center space-x-4 shadow-inner">
+                <div class="text-center">
+                    <span class="text-xs text-slate-400 block">關卡</span>
+                    <span id="level-display" class="text-base md:text-lg font-bold text-amber-400">第 1 關</span>
+                </div>
+                <div class="h-6 w-[1px] bg-slate-700"></div>
+                <div class="text-center">
+                    <span class="text-xs text-slate-400 block">已清理</span>
+                    <span id="progress-display" class="text-base md:text-lg font-bold text-emerald-400">0 / 50</span>
+                </div>
+                <div class="h-6 w-[1px] bg-slate-700"></div>
+                <div class="text-center">
+                    <span class="text-xs text-slate-400 block">當前積分</span>
+                    <span id="score-display" class="text-xl md:text-2xl font-black text-cyan-300">0</span>
+                </div>
+            </div>
+
+            <!-- 重新開始按鈕 -->
+            <button onclick="restartGame()" class="hidden md:flex items-center space-x-1 bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm font-bold transition shadow">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>重來</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主遊戲畫面 (海灘與天空區域) -->
+    <main id="game-container" class="relative w-full flex-1 flex flex-col justify-end overflow-hidden">
+
+        <!-- 上半部：藍天與海洋背景 (佔據上半 45%) -->
+        <div class="absolute top-0 left-0 w-full h-[45%] bg-gradient-to-b from-sky-400 via-cyan-500 to-blue-600 z-0 overflow-hidden">
+            <!-- 太陽與雲朵裝飾 -->
+            <div class="absolute top-6 left-12 w-16 h-16 bg-amber-300 rounded-full blur-md opacity-80"></div>
+            <div class="absolute top-10 left-10 text-amber-200 text-5xl opacity-90"><i class="fa-solid fa-sun"></i></div>
+            
+            <div class="absolute top-8 left-[30%] text-white/40 text-4xl sparkle-bg"><i class="fa-solid fa-cloud"></i></div>
+            <div class="absolute top-16 left-[70%] text-white/30 text-5xl sparkle-bg" style="animation-delay: 1.5s;"><i class="fa-solid fa-cloud"></i></div>
+            
+            <!-- 海浪漸層與動態波浪邊緣 -->
+            <div class="absolute bottom-0 left-0 w-full">
+                <!-- 後層海浪 -->
+                <svg class="w-[120%] h-12 text-cyan-400/50 animate-wave relative -left-4" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                    <path d="M0,0 C150,90 350,-40 500,40 C650,120 900,20 1200,60 L1200,120 L0,120 Z" fill="currentColor"></path>
+                </svg>
+                <!-- 前層浪花 -->
+                <svg class="w-[110%] h-10 text-amber-100/70 animate-wave -mt-6 relative -left-2" style="animation-delay: -2s;" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                    <path d="M0,30 C200,70 400,10 600,50 C800,90 1000,20 1200,40 L1200,120 L0,120 Z" fill="currentColor"></path>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 下半部：沙灘區域 (佔據下半 55%) -->
+        <div id="beach-area" class="relative w-full h-[55%] bg-gradient-to-b from-amber-200 via-amber-300 to-yellow-500 border-t-4 border-amber-100/50 z-10 shadow-inner">
+            
+            <!-- 沙灘紋理裝飾細節 (貝殼/小石子) -->
+            <div class="absolute top-8 left-[15%] text-amber-600/30 text-lg"><i class="fa-solid fa-note-sticky rotate-12"></i></div>
+            <div class="absolute top-20 right-[25%] text-amber-700/20 text-xl"><i class="fa-solid fa-cubes"></i></div>
+            <div class="absolute bottom-12 left-[40%] text-amber-800/20 text-sm"><i class="fa-solid fa-circle"></i></div>
+            <div class="absolute bottom-8 right-[10%] text-amber-700/30 text-2xl"><i class="fa-solid fa-water"></i></div>
+
+            <!-- 50 個垃圾會由 JavaScript 動態渲染在此區域內 -->
+        </div>
+    </main>
+
+    <!-- 結算彈出視窗 (Modal) -->
+    <div id="success-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-gradient-to-b from-slate-800 to-slate-900 border-2 border-emerald-500/50 rounded-3xl p-6 md:p-8 max-w-md w-11/12 text-center shadow-2xl transform scale-95 transition-transform duration-300 id='modal-card'">
+            
+            <div class="w-20 h-20 bg-emerald-500/20 border-2 border-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-400 text-4xl shadow-lg animate-bounce">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+
+            <h2 class="text-3xl font-black text-white mb-1">任務成功！</h2>
+            <p class="text-emerald-400 text-sm font-semibold mb-4">海岸線恢復了乾淨美好的面貌！</p>
+            
+            <!-- 統計報告數據箱 -->
+            <div class="bg-slate-950/60 rounded-2xl p-4 mb-6 border border-slate-700/60 text-left space-y-2">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">總共清除垃圾：</span>
+                    <span class="text-white font-bold text-base">50 件</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">本關卡得分：</span>
+                    <span id="modal-score" class="text-amber-400 font-extrabold text-lg">0 分</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">永續評級：</span>
+                    <span id="modal-rating" class="text-emerald-300 font-bold">SDGs 淨灘達人 🌟</span>
+                </div>
+            </div>
+
+            <!-- 操作按鈕 -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button onclick="nextLevel()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2">
+                    <span>前往下一關</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+                <button onclick="restartGame()" class="sm:w-1/3 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-3 px-4 rounded-xl transition transform active:scale-95">
+                    重頭開始
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 遊戲邏輯 JavaScript -->
+    <script>
+        // 垃圾數據定義 (包含類別、名稱、得分、尺寸與SVG圖樣/圖示定義)
+        const TRASH_TYPES = [
+            {
+                type: 'plastic_bottle',
+                name: '寶特瓶',
+                score: 20,
+                size: 'medium', // 40-50px
+                width: 42,
+                height: 42,
+                color: 'text-blue-500',
+                svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-full h-full text-cyan-600 drop-shadow"><path d="M9 3h6v3H9z" fill="currentColor"/><path d="M8 6h8l1 3v11a2 2 0 01-2 2H9a2 2 0 01-2-2V9l1-3z" fill="#38bdf8" opacity="0.8"/><path d="M9 12h6M9 15h6" stroke="#ffffff" stroke-width="1.5"/></svg>`
+            },
+            {
+                type: 'paper_box',
+                name: '紙餐盒',
+                score: 10,
+                size: 'small', // 30-35px
+                width: 36,
+                height: 36,
+                color: 'text-amber-700',
+                svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full"><path d="M3 8l9-4 9 4-9 4-9-4z" fill="#d97706"/><path d="M3 8v8l9 4V12L3 8z" fill="#b45309"/><path d="M21 8v8l-9 4V12l9-4z" fill="#f59e0b"/></svg>`
+            },
+            {
+                type: 'plastic_bag',
+                name: '塑膠袋',
+                score: 10,
+                size: 'small',
+                width: 34,
+                height: 34,
+                color: 'text-slate-300',
+                svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full opacity-85"><path d="M6 9C6 6.5 8 5 12 5C16 5 18 6.5 18 9V20C18 21 16.5 22 12 22C7.5 22 6 21 6 20V9Z" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/><path d="M9 5V8M15 5V8" stroke="#64748b" stroke-width="2" stroke-linecap="round"/></svg>`
+            },
+            {
+                type: 'styrofoam',
+                name: '保麗龍箱',
+                score: 30,
+                size: 'large', // 55-65px
+                width: 60,
+                height: 50,
+                color: 'text-slate-100',
+                svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full"><rect x="2" y="5" width="20" height="14" rx="2" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/><path d="M2 9h20" stroke="#94a3b8" stroke-width="1.5"/><circle cx="7" cy="14" r="1" fill="#cbd5e1"/><circle cx="12" cy="14" r="1" fill="#cbd5e1"/><circle cx="17" cy="14" r="1" fill="#cbd5e1"/></svg>`
+            },
+            {
+                type: 'drink_cup',
+                name: '飲料杯',
+                score: 20,
+                size: 'medium',
+                width: 40,
+                height: 48,
+                color: 'text-rose-400',
+                svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full"><path d="M6 7l1.5 14h9L18 7H6z" fill="#fb7185"/><path d="M5 4h14v3H5z" fill="#fda4af"/><path d="M13 1v3" stroke="#e11d48" stroke-width="2" stroke-linecap="round"/></svg>`
+            },
+            {
+                type: 'driftwood_can',
+                name: '漂流木與廢罐頭',
+                score: 30,
+                size: 'large',
+                width: 62,
+                height: 52,
+                color: 'text-amber-900',
+                svg: `<svg viewBox="0 0 24 24" fill="none" class="w-full h-full"><path d="M3 17c5-3 12 1 18-2M2 12c6-1 11 3 19-1" stroke="#78350f" stroke-width="4" stroke-linecap="round"/><circle cx="17" cy="9" r="4" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/><path d="M15 8h4" stroke="#e2e8f0" stroke-width="1"/></svg>`
+            }
+        ];
+
+        // 遊戲狀態變數
+        const TOTAL_TRASH_COUNT = 50;
+        let currentScore = 0;
+        let cleanedCount = 0;
+        let currentLevel = 1;
+
+        // DOM 元素引用
+        const beachArea = document.getElementById('beach-area');
+        const scoreDisplay = document.getElementById('score-display');
+        const progressDisplay = document.getElementById('progress-display');
+        const levelDisplay = document.getElementById('level-display');
+        const successModal = document.getElementById('success-modal');
+        const modalScore = document.getElementById('modal-score');
+
+        // 初始化遊戲
+        window.onload = function() {
+            initGame();
+        };
+
+        // 初始化/重置垃圾散列
+        function initGame() {
+            // 清空沙灘區域的舊垃圾
+            beachArea.innerHTML = `
+                <div class="absolute top-8 left-[15%] text-amber-600/30 text-lg"><i class="fa-solid fa-note-sticky rotate-12"></i></div>
+                <div class="absolute top-20 right-[25%] text-amber-700/20 text-xl"><i class="fa-solid fa-cubes"></i></div>
+                <div class="absolute bottom-12 left-[40%] text-amber-800/20 text-sm"><i class="fa-solid fa-circle"></i></div>
+                <div class="absolute bottom-8 right-[10%] text-amber-700/30 text-2xl"><i class="fa-solid fa-water"></i></div>
+            `;
+            
+            cleanedCount = 0;
+            updateUI();
+            closeModal();
+
+            // 產生 50 個隨機位置與角度的垃圾
+            for (let i = 0; i < TOTAL_TRASH_COUNT; i++) {
+                createRandomTrash(i);
+            }
+        }
+
+        // 建立單個垃圾元素
+        function createRandomTrash(id) {
+            // 隨機選擇一種垃圾類別
+            const randomType = TRASH_TYPES[Math.floor(Math.random() * TRASH_TYPES.length)];
+            
+            const trashEl = document.createElement('div');
+            trashEl.className = 'trash-item select-none';
+            trashEl.dataset.id = id;
+            trashEl.dataset.score = randomType.score;
+
+            // 隨機角度 (0 到 360 度)
+            const randomRotation = Math.floor(Math.random() * 360);
+            
+            // 隨機位置限制在沙灘區域下半部 (邊界保護，防止超出一頁)
+            // X 座標： 3% ~ 90%
+            // Y 座標： 8% ~ 82%
+            const randomX = Math.floor(Math.random() * 87) + 3;
+            const randomY = Math.floor(Math.random() * 74) + 8;
+
+            trashEl.style.width = `${randomType.width}px`;
+            trashEl.style.height = `${randomType.height}px`;
+            trashEl.style.left = `${randomX}%`;
+            trashEl.style.top = `${randomY}%`;
+            trashEl.style.transform = `rotate(${randomRotation}deg)`;
+
+            // 載入 SVG 圖案
+            trashEl.innerHTML = randomType.svg;
+
+            // 點擊清理事件
+            trashEl.addEventListener('click', function(e) {
+                e.stopPropagation();
+                cleanTrash(trashEl, randomType.score, e.clientX, e.clientY);
+            });
+
+            // 支援行動裝置觸控
+            trashEl.addEventListener('touchstart', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                const touch = e.touches[0];
+                cleanTrash(trashEl, randomType.score, touch.clientX, touch.clientY);
+            }, { passive: false });
+
+            beachArea.appendChild(trashEl);
+        }
+
+        // 清理垃圾邏輯
+        function cleanTrash(element, score, clientX, clientY) {
+            if (element.classList.contains('cleaned')) return;
+            element.classList.add('cleaned');
+
+            // 增加分數與統計
+            currentScore += score;
+            cleanedCount++;
+            
+            // 顯示浮動 +得分 特效
+            showFloatingScore(score, clientX, clientY);
+
+            // 移除垃圾元素 (縮小淡出)
+            element.style.transform += ' scale(0)';
+            element.style.opacity = '0';
+            setTimeout(() => {
+                element.remove();
+            }, 150);
+
+            // 更新 UI
+            updateUI();
+
+            // 檢查是否完全清理完成 (50/50)
+            if (cleanedCount >= TOTAL_TRASH_COUNT) {
+                setTimeout(() => {
+                    showSuccessModal();
+                }, 500);
+            }
+        }
+
+        // 浮動得分數字動畫
+        function showFloatingScore(score, x, y) {
+            const floatEl = document.createElement('div');
+            floatEl.className = 'score-float text-amber-300 text-xl md:text-2xl';
+            floatEl.innerText = `+${score}`;
+            floatEl.style.left = `${x}px`;
+            floatEl.style.top = `${y}px`;
+
+            document.body.appendChild(floatEl);
+
+            setTimeout(() => {
+                floatEl.remove();
+            }, 800);
+        }
+
+        // 更新數據面板
+        function updateUI() {
+            scoreDisplay.innerText = currentScore;
+            progressDisplay.innerText = `${cleanedCount} / ${TOTAL_TRASH_COUNT}`;
+            levelDisplay.innerText = `第 ${currentLevel} 關`;
+        }
+
+        // 顯示成功過關視窗
+        function showSuccessModal() {
+            modalScore.innerText = `${currentScore} 分`;
+            successModal.classList.remove('opacity-0', 'pointer-events-none');
+            const card = successModal.querySelector('div');
+            card.classList.remove('scale-95');
+            card.classList.add('scale-100');
+        }
+
+        // 關閉 Modal
+        function closeModal() {
+            successModal.classList.add('opacity-0', 'pointer-events-none');
+            const card = successModal.querySelector('div');
+            card.classList.remove('scale-100');
+            card.classList.add('scale-95');
+        }
+
+        // 前往下一關 (累積分數並載入全新散落垃圾)
+        function nextLevel() {
+            currentLevel++;
+            initGame();
+        }
+
+        // 重新開始遊戲 (分數歸零從頭開始)
+        function restartGame() {
+            currentScore = 0;
+            currentLevel = 1;
+            initGame();
+        }
+    </script>
+</body>
+</html>
